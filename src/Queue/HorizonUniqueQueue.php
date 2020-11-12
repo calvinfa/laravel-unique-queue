@@ -20,19 +20,18 @@ class HorizonUniqueQueue extends RedisQueue
     public function pushRaw($payload, $queue = null, array $options = [])
     {
         $connection = $this->getConnection();
-
-        $tracker = $this->getTrackerName($queue);
-
         $data = json_decode($payload, true);
 
-        $exists = $connection->hexists($tracker, $data['uniqueIdentifier']);
+        $tracker = $this->getTrackerName($queue) . ":" . $data['uniqueIdentifier'];
+
+        $exists = $connection->exists($tracker);
 
         if ($exists) {
             return null;
         }
 
         if (parent::pushRaw($payload, $queue, $options)) {
-            $connection->hset($tracker, $data['uniqueIdentifier'], $data['id']);
+            $connection->set($tracker, $data['id'], "ex", 8 * 60 * 60);
         }
     }
 
@@ -62,7 +61,7 @@ class HorizonUniqueQueue extends RedisQueue
 
         $data = json_decode($job->getRawBody(), true);
 
-        $this->getConnection()->hdel($this->getTrackerName($queue), $data['uniqueIdentifier']);
+        $this->getConnection()->del($this->getTrackerName($queue) . ":" . $data['uniqueIdentifier']);
     }
 
     protected function getTrackerName($queue)
